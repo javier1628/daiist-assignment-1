@@ -13,7 +13,7 @@ Target: `dead = (Stock <= 0) & (Punto reorden == 0)` on `Tipo == 'Producto'` row
 | Tipo | Producto / Servicio (keyword-derived) | filter: Producto only |
 | Stock | units on hand (negative = sold more than received) | **excluded — the label is built from it** |
 | Estado stock | Negativo / Sin stock / Bajo mínimo / En stock | **excluded — derived from Stock** |
-| Costo | average unit cost, DOP (assumed) | feature (as log); also prices a false positive |
+| Costo | average unit cost, DOP (assumed) | not a feature (log(Costo) tried, no gain); prices a false positive |
 | Precio detalle | retail price | **excluded as feature** — used only in the cost model (FP cost = 2 × margin) |
 | Precio mayor 1/2/3 | wholesale tiers | **excluded as feature** (markup × cost) |
 | Precio mínimo | floor price | **excluded as feature** (markup × cost) |

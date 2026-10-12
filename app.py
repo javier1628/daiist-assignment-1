@@ -27,7 +27,7 @@ from sklearn.metrics import roc_curve
 import gradio as gr
 
 from src import data
-from src.data import FN_COST, FP_MARGIN_MULTIPLIER, fp_cost_per_sku
+from src.data import FN_COST, FP_COST_CAP, FP_MARGIN_MULTIPLIER, fp_cost_per_sku
 from src.features import build_features, family, material
 
 MODELS_DIR = Path(__file__).resolve().parent / "models"
@@ -293,7 +293,8 @@ def threshold_view(threshold: float, model_name: str):
     note = (
         f"### {flagged} of {len(Y_TEST)} test SKUs flagged · expected cost **{cost:,.0f} DOP**\n"
         f"- false positives: {fp} live items flagged, costing **{fp_cost:,.0f}** "
-        f"({FP_MARGIN_MULTIPLIER:.0f} × each SKU's own margin, Precio detalle − Costo)\n"
+        f"({FP_MARGIN_MULTIPLIER:.0f} × each SKU's own margin, Precio detalle − Costo, "
+        f"capped at {FP_COST_CAP:,.0f})\n"
         f"- false negatives: {fn} dead items missed, costing **{fn_cost:,.0f}** "
         f"({fn} × flat {FN_COST:,.0f})\n\n"
         f"Of the {flagged} flagged, {tp} are actually dead "
@@ -306,9 +307,7 @@ def threshold_view(threshold: float, model_name: str):
 
 
 # ----------------------------------------------------------------------------- Tab 4: Scorer
-def score(desc, prefix, dept, supplier, area, empaque, costo) -> pd.DataFrame:
-    if costo is None or costo <= 0:
-        raise gr.Error("Cost must be > 0 (the model uses log(Costo)).")
+def score(desc, prefix, dept, supplier, area, empaque, costo, precio) -> tuple[pd.DataFrame, str]:
     # Turn the chosen prefix back into a Código whose code_prefix() == prefix, because
     # build_features derives the prefix from Código, not from a prefix field.
     if prefix == "NUM":
@@ -327,7 +326,9 @@ def score(desc, prefix, dept, supplier, area, empaque, costo) -> pd.DataFrame:
         "Suplidor (ID)": int(supplier),
         "Área (ID)": int(area),
         "Empaque": int(empaque),
+        # Price and cost are NOT features; they only price a false positive below.
         "Costo": float(costo),
+        "Precio detalle": float(precio),
     }])
 
     X, _ = build_features(row, fit=feature_fit)   # reuse fit: learns nothing
@@ -341,7 +342,12 @@ def score(desc, prefix, dept, supplier, area, empaque, costo) -> pd.DataFrame:
             "P(dead)": round(p, 3),
             f"decision @ {THRESHOLD:.2f}": "review for discontinuation" if p >= THRESHOLD else "keep",
         })
-    return pd.DataFrame(rows)
+    fp_cost = float(fp_cost_per_sku(row).iloc[0])
+    note = (f"If this SKU is live and gets flagged anyway, the assumed cost is "
+            f"**{fp_cost:,.0f} DOP** ({FP_MARGIN_MULTIPLIER:.0f} × margin "
+            f"{precio - costo:,.0f}, floored at 0, capped at {FP_COST_CAP:,.0f}). "
+            f"Missing it if dead: {FN_COST:,.0f} DOP.")
+    return pd.DataFrame(rows), note
 
 
 # ----------------------------------------------------------------------------- UI
@@ -395,15 +401,19 @@ with gr.Blocks(title="Display Internacional — dead-stock classifier") as demo:
             in_supplier = gr.Number(value=0, precision=0, label="Suplidor (ID)")
             in_area = gr.Number(value=0, precision=0, label="Área (ID)")
             in_empaque = gr.Number(value=1, precision=0, label="Empaque (units/pack)")
-            in_costo = gr.Number(value=1000, label="Costo (DOP)")
+        with gr.Row():
+            in_costo = gr.Number(value=1000, label="Costo (DOP) — for the cost figure only")
+            in_precio = gr.Number(value=2500, label="Precio detalle (DOP) — for the cost figure only")
         go = gr.Button("Score SKU", variant="primary")
         out = gr.Dataframe(label="P(dead) per model")
+        out_cost = gr.Markdown()
 
-        def _score(desc, prefix, dept, supplier, area, empaque, costo):
+        def _score(desc, prefix, dept, supplier, area, empaque, costo, precio):
             dept_val = -1 if dept == "(other)" else dept  # catch-all → unseen dept id
-            return score(desc, prefix, dept_val, supplier, area, empaque, costo)
+            return score(desc, prefix, dept_val, supplier, area, empaque, costo, precio)
 
-        go.click(_score, [in_desc, in_prefix, in_dept, in_supplier, in_area, in_empaque, in_costo], out)
+        go.click(_score, [in_desc, in_prefix, in_dept, in_supplier, in_area, in_empaque, in_costo, in_precio],
+                 [out, out_cost])
 
 
 if __name__ == "__main__":

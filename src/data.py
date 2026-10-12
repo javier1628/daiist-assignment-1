@@ -31,7 +31,11 @@ PRICE_COLUMNS = [
 # assumed to be lost twice over (the sale that was in the pipeline and the next one),
 # hence the multiplier. Per SKU, floored at 0 for the few items priced below cost.
 # False negative = keeping a dead item listed: a flat catalogue/admin/storage drag per SKU.
+# The FP cost is CAPPED: a wrongly discontinued high-value item gets noticed and re-listed
+# within weeks, so the realistic loss is bounded, however large its margin on paper. Without
+# the cap a handful of big-margin SKUs dominate the threshold choice.
 FP_MARGIN_MULTIPLIER = 2.0
+FP_COST_CAP = 10_000.0
 FN_COST = 500.0
 
 
@@ -50,10 +54,10 @@ def make_target(df: pd.DataFrame) -> pd.Series:
 
 def fp_cost_per_sku(df: pd.DataFrame) -> pd.Series:
     """Cost of wrongly flagging each SKU as dead: FP_MARGIN_MULTIPLIER x its unit margin,
-    never negative. Works on any frame that has Precio detalle and Costo (raw rows or
-    test_predictions.csv)."""
+    floored at 0 and capped at FP_COST_CAP. Works on any frame that has Precio detalle and
+    Costo (raw rows or test_predictions.csv); it is the ONE place this cost is defined."""
     margin = df["Precio detalle"] - df["Costo"]
-    return (FP_MARGIN_MULTIPLIER * margin).clip(lower=0.0)
+    return (FP_MARGIN_MULTIPLIER * margin).clip(lower=0.0, upper=FP_COST_CAP)
 
 
 def split(df: pd.DataFrame):

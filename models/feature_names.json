@@ -43,7 +43,5 @@
   "has_dims",
   "has_color",
   "n_words",
-  "empaque",
-  "log1p_empaque",
-  "log_costo"
+  "log1p_empaque"
 ]

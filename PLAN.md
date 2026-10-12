@@ -43,8 +43,8 @@ From `Descripción` (free text, Spanish/English mix):
 From `Código`: alphabetic prefix, top 10 + OTHER (813 codes are purely numeric → `NUM`)
 Categoricals: `Dpto (ID)`, `Suplidor (ID)`, `Área (ID)` → frequency encoding (count in train),
 plus one-hot for the top 8 departments. Document why not full one-hot (74 suppliers / 2k rows).
-Numeric: `Empaque`, `log1p(Empaque)`, **`log_costo = log(Costo)`** (new; cost spans six orders
-of magnitude, the log keeps it on the same footing as the other standardised columns).
+Numeric: `log1p(Empaque)` only (raw `Empaque` dropped as a near-duplicate). `log(Costo)` was
+tried and dropped: test AUC 0.7206 with it, 0.7217 without.
 Standardise everything with `StandardScaler` fit on train.
 
 ## 4. Split

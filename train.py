@@ -43,9 +43,13 @@ ROOT = Path(__file__).resolve().parent
 MODELS_DIR = ROOT / "models"
 
 # Hyperparameter grids. PLAN.md limits tuning to these and nothing else.
-LOGREG_CS = [0.01, 0.1, 1.0, 10.0]
+# C stops at 1: with {0.01, 0.1, 1, 10}, C=10 won validation by 0.0006 AUC over C=1 (noise),
+# and at that near-zero L2 the manual gradient-descent loop stopped 1.85 short of sklearn on
+# its worst coefficient (2000 epochs; still 0.91 at 50k) along the correlated/heavy-tailed
+# empaque, log1p_empaque and size_cm columns, with test AUC unchanged. Written up in REPORT.md.
+LOGREG_CS = [0.01, 0.1, 1.0]
 MANUAL_LRS = [0.1, 0.01, 0.001]
-MANUAL_EPOCHS = 2000
+MANUAL_EPOCHS = 5000  # 2000 left the manual loop 0.72 off sklearn at C=1; 5000 was the agreed next step
 # nn.Linear + Adam: lr is fixed (Adam is forgiving); weight_decay is matched to the
 # chosen C below so all three models land on ~the same coefficients.
 TORCH_LR = 0.05
@@ -167,9 +171,10 @@ def main() -> None:
           f"|  dead rate train {y_train.mean():.3f}")
 
     # Validation split carved out of TRAIN, used only to pick hyperparameters + threshold.
+    # Stratified like the main split, so the slice has the same dead rate as train.
     # The per-SKU FP costs travel with the rows so the threshold scan can price mistakes.
     Xt, Xv, yt, yv, _, fpv = train_test_split(
-        X_train, y_train, fp_train, test_size=0.2, random_state=SEED
+        X_train, y_train, fp_train, test_size=0.2, random_state=SEED, stratify=y_train
     )
 
     metrics: dict = {
@@ -357,19 +362,6 @@ def main() -> None:
     print(f"final train loss: manual {manual_params['loss_curve'][-1]:.4f}, "
           f"nn.Linear {torch_loss_curve[-1]:.4f}")
     print(f"\nsaved artefacts to {MODELS_DIR}")
-
-    # 6. Ablation note on log_costo, printed only (nothing from here is saved). Features are
-    # standardised, so these coefficients are directly comparable across features.
-    i_cost = feature_names.index("log_costo")
-    print("\n=== ablation: log_costo ===")
-    print(f"standardised coefficient of log_costo: logreg {w_sk[i_cost]:+.4f}, "
-          f"manual {w_manual[i_cost]:+.4f}, nn.Linear {w_torch[i_cost]:+.4f}")
-    keep = [j for j in range(len(feature_names)) if j != i_cost]
-    ablated = LogisticRegression(C=best_C, max_iter=5000).fit(X_train[:, keep], y_train)
-    auc_full = metrics["logreg"]["test"]["at_0.5"]["roc_auc"]
-    auc_ablated = float(roc_auc_score(y_test, ablated.predict_proba(X_test[:, keep])[:, 1]))
-    print(f"sklearn test AUC with log_costo {auc_full:.4f}  |  without log_costo {auc_ablated:.4f}  "
-          f"(same C={best_C}, same split; ablation model not saved)")
 
 
 if __name__ == "__main__":

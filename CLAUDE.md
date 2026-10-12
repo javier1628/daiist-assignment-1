@@ -23,7 +23,8 @@ validation slice, and the dashboard recomputes that cost live as the threshold m
   `Punto reorden`, `Cant. reorden`, `Alertas` — the label is built from these.
 - **Price columns stay excluded**: `Precio detalle`, `Precio mayor 1/2/3`, `Precio mínimo`,
   `Margen %`. They are markup × cost and add nothing beyond `Costo`.
-- `Costo` IS an allowed feature now, as `log_costo = log(Costo)`.
+- `Costo` is allowed as a feature but currently NOT used: `log(Costo)` was tried and dropped
+  (no AUC gain). It is still read, with `Precio detalle`, to price a false positive.
 - Only logistic regression. No trees, no boosting, no neural nets beyond a single `nn.Linear`.
 - Three models: `LogisticRegression(C)`; manual PyTorch loop with sigmoid + binary
   cross-entropy + L2 on raw tensors; `nn.Linear` + `BCEWithLogitsLoss` + `Adam`.
