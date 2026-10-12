@@ -57,8 +57,14 @@ def fp_cost_per_sku(df: pd.DataFrame) -> pd.Series:
 
 
 def split(df: pd.DataFrame):
-    """One split for the whole project. Returns (train_df, test_df)."""
-    return train_test_split(df, test_size=TEST_SIZE, random_state=RANDOM_STATE)
+    """One split for the whole project. Returns (train_df, test_df).
+
+    Stratified on the label so train and test have the same dead rate. NOTE: stratifying
+    changes which rows land in the test set compared with the earlier regression run
+    (same random_state, different split), so numbers are not comparable across the two."""
+    return train_test_split(
+        df, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=make_target(df)
+    )
 
 
 if __name__ == "__main__":
