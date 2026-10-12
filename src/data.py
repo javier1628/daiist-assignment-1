@@ -4,7 +4,6 @@ Every model trains on exactly the split this module returns, so the comparison i
 """
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
@@ -12,12 +11,18 @@ DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "inventario_julio_202
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
 
-# Columns that must never become features (see CLAUDE.md / data/README.md).
+# Columns that must never become features: the label is built from Stock and Punto reorden,
+# and the other four are functions of the same columns (see CLAUDE.md / data/README.md).
+# Price columns are excluded separately as a design choice (markup x cost, nothing beyond Costo).
 LEAKY_COLUMNS = [
-    "Precio detalle", "Precio mayor 1", "Precio mayor 2", "Precio mayor 3", "Precio mínimo",
-    "Margen %", "Stock", "Estado stock", "Valor inventario", "Punto reorden", "Cant. reorden",
-    "Alertas",
+    "Stock", "Estado stock", "Valor inventario", "Punto reorden", "Cant. reorden", "Alertas",
 ]
+
+# Business cost of each kind of mistake, in DOP. ASSUMPTIONS, not measured figures:
+# a false positive discontinues a live item; a false negative keeps a dead one listed.
+# Used by train.py to pick the threshold and by app.py to show the live cost figure.
+FP_COST = 1500.0
+FN_COST = 300.0
 
 
 def load_raw() -> pd.DataFrame:
@@ -28,8 +33,9 @@ def load_raw() -> pd.DataFrame:
 
 
 def make_target(df: pd.DataFrame) -> pd.Series:
-    """log(Costo): cost spans 6 orders of magnitude, so model the log, not the raw value."""
-    return np.log(df["Costo"])
+    """Dead stock = nothing on hand AND no reorder point, i.e. the system does not intend
+    to restock it. Returned as int (1 = dead, 0 = live)."""
+    return ((df["Stock"] <= 0) & (df["Punto reorden"] == 0)).astype(int)
 
 
 def split(df: pd.DataFrame):
@@ -41,4 +47,5 @@ if __name__ == "__main__":
     df = load_raw()
     tr, te = split(df)
     print(f"{len(df)} rows -> train {len(tr)} / test {len(te)}")
-    print(make_target(df).describe())
+    y = make_target(df)
+    print(f"dead: {int(y.sum())} of {len(y)} ({y.mean():.1%})")
