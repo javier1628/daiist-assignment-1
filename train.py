@@ -358,6 +358,19 @@ def main() -> None:
           f"nn.Linear {torch_loss_curve[-1]:.4f}")
     print(f"\nsaved artefacts to {MODELS_DIR}")
 
+    # 6. Ablation note on log_costo, printed only (nothing from here is saved). Features are
+    # standardised, so these coefficients are directly comparable across features.
+    i_cost = feature_names.index("log_costo")
+    print("\n=== ablation: log_costo ===")
+    print(f"standardised coefficient of log_costo: logreg {w_sk[i_cost]:+.4f}, "
+          f"manual {w_manual[i_cost]:+.4f}, nn.Linear {w_torch[i_cost]:+.4f}")
+    keep = [j for j in range(len(feature_names)) if j != i_cost]
+    ablated = LogisticRegression(C=best_C, max_iter=5000).fit(X_train[:, keep], y_train)
+    auc_full = metrics["logreg"]["test"]["at_0.5"]["roc_auc"]
+    auc_ablated = float(roc_auc_score(y_test, ablated.predict_proba(X_test[:, keep])[:, 1]))
+    print(f"sklearn test AUC with log_costo {auc_full:.4f}  |  without log_costo {auc_ablated:.4f}  "
+          f"(same C={best_C}, same split; ablation model not saved)")
+
 
 if __name__ == "__main__":
     main()
