@@ -12,7 +12,7 @@ RANDOM_STATE = 42
 TEST_SIZE = 0.2
 
 # Columns that must never become features: the label is built from Stock and Punto reorden,
-# and the other four are functions of the same columns (see CLAUDE.md / data/README.md).
+# and the other four are functions of the same columns (see REPORT.md / data/README.md).
 # Price columns are excluded separately as a design choice (markup x cost, nothing beyond Costo).
 LEAKY_COLUMNS = [
     "Stock", "Estado stock", "Valor inventario", "Punto reorden", "Cant. reorden", "Alertas",

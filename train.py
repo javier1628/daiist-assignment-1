@@ -5,7 +5,7 @@ This is the ONLY script that fits anything. It:
   2. builds features via the owner's build_features (src.features)
   3. fits two baselines, LogisticRegression, the manual PyTorch loop, and an nn.Linear model
   4. picks the decision threshold that minimises expected business cost on the validation slice
-  5. writes everything under models/ as PLAN.md section 5 lists
+  5. writes everything under models/ that the dashboard and REPORT.md rely on
 
 Run from the repo root:  uv run python main.py train
 
@@ -42,7 +42,7 @@ np.random.seed(SEED)
 ROOT = Path(__file__).resolve().parent
 MODELS_DIR = ROOT / "models"
 
-# Hyperparameter grids. PLAN.md limits tuning to these and nothing else.
+# Hyperparameter grids. Tuning is limited to these and nothing else (see REPORT.md).
 # C stops at 1: with {0.01, 0.1, 1, 10}, C=10 won validation by 0.0006 AUC over C=1 (noise),
 # and at that near-zero L2 the manual gradient-descent loop stopped 1.85 short of sklearn on
 # its worst coefficient (2000 epochs; still 0.91 at 50k) along the correlated/heavy-tailed
@@ -294,7 +294,7 @@ def main() -> None:
         },
     }
 
-    # 4. Save everything PLAN.md section 5 lists.
+    # 4. Save every artefact the dashboard loads (listed in REPORT.md, How to run).
     scaler = fit.get("scaler")
     if scaler is None:
         raise KeyError(

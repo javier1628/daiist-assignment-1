@@ -111,7 +111,7 @@ def _assemble(df: pd.DataFrame, fit: dict) -> pd.DataFrame:
     parts.append(pd.get_dummies(dpt_top).reindex(columns=fit["dept_levels"], fill_value=0).add_prefix("dpt_"))
 
     # Frequency encoding: how often each ID appears in TRAIN. Unseen IDs → 0.
-    # One number instead of 74 supplier dummies on 2k rows (see PLAN §3).
+    # One number instead of 74 supplier dummies on 2k rows (see REPORT.md, Features).
     freq = pd.DataFrame(index=df.index)
     freq["freq_supplier"] = df["Suplidor (ID)"].astype(str).map(fit["freq_supplier"]).fillna(0.0)
     freq["freq_dpto"] = dpt_raw.map(fit["freq_dpto"]).fillna(0.0)
