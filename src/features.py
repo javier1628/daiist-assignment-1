@@ -127,6 +127,9 @@ def _assemble(df: pd.DataFrame, fit: dict) -> pd.DataFrame:
     empaque = pd.to_numeric(df["Empaque"], errors="coerce").fillna(fit["empaque_median"])
     num["empaque"] = empaque
     num["log1p_empaque"] = np.log1p(empaque)
+    # Cost is a feature now (target is dead-stock, not cost). Log because it spans six
+    # orders of magnitude; load_raw guarantees Costo > 0 so the log is always defined.
+    num["log_costo"] = np.log(pd.to_numeric(df["Costo"], errors="coerce"))
     parts.append(num)
 
     return pd.concat(parts, axis=1).astype(float)
