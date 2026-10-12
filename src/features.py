@@ -120,15 +120,15 @@ def _assemble(df: pd.DataFrame, fit: dict) -> pd.DataFrame:
 
     # Parsed + numeric. NaNs filled with the TRAIN median so the frame is all-float, no-NaN.
     num = pd.DataFrame(index=df.index)
-    num["size_cm"] = desc.map(size_cm).fillna(fit["size_median"])
+    # Size enters as log1p: raw size_cm is heavy-tailed (a few multi-metre fixtures among
+    # centimetre hooks) and that tail was the ill-conditioned direction the manual gradient
+    #-descent loop crawled along, leaving it 0.56 off sklearn on this one coefficient.
+    num["log1p_size_cm"] = np.log1p(desc.map(size_cm).fillna(fit["size_median"]))
     num["has_dims"] = desc.map(lambda t: float(bool(DIMS_RE.search(t))))
     num["has_color"] = desc.map(lambda t: float(any(c in t.upper() for c in COLORS)))
     num["n_words"] = desc.str.split().map(len).astype(float)
-    # Pack size enters only as log1p: the raw column was a near-duplicate of it, and the
-    # pair was the slowest direction for gradient descent to converge along. log(Costo) was
-    # tried as a feature and dropped: no AUC gain (ablation in the report).
-    empaque = pd.to_numeric(df["Empaque"], errors="coerce").fillna(fit["empaque_median"])
-    num["log1p_empaque"] = np.log1p(empaque)
+    # Dropped on purpose: Empaque (1 for 99.7% of SKUs, so any other value lands many
+    # standard deviations out) and log(Costo) (no AUC gain in the ablation).
     parts.append(num)
 
     return pd.concat(parts, axis=1).astype(float)
@@ -149,7 +149,6 @@ def build_features(df: pd.DataFrame, fit: dict | None = None) -> tuple[pd.DataFr
         fit["freq_dpto"] = df["Dpto (ID)"].astype(str).value_counts().to_dict()
         fit["freq_area"] = df["Área (ID)"].astype(str).value_counts().to_dict()
         fit["size_median"] = float(np.nanmedian(desc.map(size_cm).to_numpy(dtype=float)))
-        fit["empaque_median"] = float(pd.to_numeric(df["Empaque"], errors="coerce").median())
 
         raw = _assemble(df, fit)
         fit["columns"] = list(raw.columns)

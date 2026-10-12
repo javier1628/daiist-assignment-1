@@ -36,7 +36,11 @@ PRICE_COLUMNS = [
 # the cap a handful of big-margin SKUs dominate the threshold choice.
 FP_MARGIN_MULTIPLIER = 2.0
 FP_COST_CAP = 10_000.0
-FN_COST = 500.0
+# A false positive is a ONE-OFF loss; a false negative RECURS every year the dead listing
+# survives. To compare them, the FN drag is expressed over the same planning horizon.
+FN_COST_PER_YEAR = 500.0
+HORIZON_YEARS = 3
+FN_COST = FN_COST_PER_YEAR * HORIZON_YEARS
 
 
 def load_raw() -> pd.DataFrame:

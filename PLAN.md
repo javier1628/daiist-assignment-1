@@ -15,7 +15,8 @@ decides.
 Cost assumptions (the owner's, marked as assumptions, constants in `src/data.py`):
 - **False positive** — flagging a live item, which gets discontinued by mistake and has to be
   re-listed or is lost as a sale: `FP_COST` DOP.
-- **False negative** — leaving a dead item listed: `FN_COST` DOP (catalogue/admin/storage drag).
+- **False negative** — leaving a dead item listed: `FN_COST_PER_YEAR` DOP of catalogue/admin/
+  storage drag, recurring, so expressed over `HORIZON_YEARS` as `FN_COST` (FP is one-off).
 These two numbers set the decision threshold (§5) and drive the live cost figure in the dashboard.
 
 ## 2. Target
@@ -38,12 +39,13 @@ From `Descripción` (free text, Spanish/English mix):
   MANIQUI, EXHIBIDOR, PORTA PRECIO, CARRO/CARRETILLA, CERRADURA, OTHER
 - material: METAL/NIQUEL/ZINC/CROMO, MADERA, ACRILICO, PLASTICO, CRISTAL/VIDRIO, OTHER
 - size: first number before `Plg` or `"` (inches) and first number before `mm`/`MTS`
-  (convert to a single `size_cm` where possible); flag `has_dims` for `AxBxC` patterns
+  (convert to a single `size_cm` where possible, used as `log1p(size_cm)`: the raw tail was the
+  ill-conditioned direction in the manual loop); flag `has_dims` for `AxBxC` patterns
 - `n_words`, `has_color` (BLANCO/NEGRO/GRIS/AZUL/ROJO/…)
 From `Código`: alphabetic prefix, top 10 + OTHER (813 codes are purely numeric → `NUM`)
 Categoricals: `Dpto (ID)`, `Suplidor (ID)`, `Área (ID)` → frequency encoding (count in train),
 plus one-hot for the top 8 departments. Document why not full one-hot (74 suppliers / 2k rows).
-Numeric: `log1p(Empaque)` only (raw `Empaque` dropped as a near-duplicate). `log(Costo)` was
+Numeric: none beyond the parsed size. `Empaque` dropped (1 for 99.7% of SKUs). `log(Costo)` was
 tried and dropped: test AUC 0.7206 with it, 0.7217 without.
 Standardise everything with `StandardScaler` fit on train.
 

@@ -307,7 +307,7 @@ def threshold_view(threshold: float, model_name: str):
 
 
 # ----------------------------------------------------------------------------- Tab 4: Scorer
-def score(desc, prefix, dept, supplier, area, empaque, costo, precio) -> tuple[pd.DataFrame, str]:
+def score(desc, prefix, dept, supplier, area, costo, precio) -> tuple[pd.DataFrame, str]:
     # Turn the chosen prefix back into a Código whose code_prefix() == prefix, because
     # build_features derives the prefix from Código, not from a prefix field.
     if prefix == "NUM":
@@ -325,7 +325,6 @@ def score(desc, prefix, dept, supplier, area, empaque, costo, precio) -> tuple[p
         "Dpto (ID)": int(dept),
         "Suplidor (ID)": int(supplier),
         "Área (ID)": int(area),
-        "Empaque": int(empaque),
         # Price and cost are NOT features; they only price a false positive below.
         "Costo": float(costo),
         "Precio detalle": float(precio),
@@ -346,7 +345,7 @@ def score(desc, prefix, dept, supplier, area, empaque, costo, precio) -> tuple[p
     note = (f"If this SKU is live and gets flagged anyway, the assumed cost is "
             f"**{fp_cost:,.0f} DOP** ({FP_MARGIN_MULTIPLIER:.0f} × margin "
             f"{precio - costo:,.0f}, floored at 0, capped at {FP_COST_CAP:,.0f}). "
-            f"Missing it if dead: {FN_COST:,.0f} DOP.")
+            f"Missing it if dead: {FN_COST:,.0f} DOP over the planning horizon.")
     return pd.DataFrame(rows), note
 
 
@@ -400,7 +399,6 @@ with gr.Blocks(title="Display Internacional — dead-stock classifier") as demo:
             in_dept = gr.Dropdown(DEPT_CHOICES, value=DEPT_CHOICES[0], label="Dpto (ID)")
             in_supplier = gr.Number(value=0, precision=0, label="Suplidor (ID)")
             in_area = gr.Number(value=0, precision=0, label="Área (ID)")
-            in_empaque = gr.Number(value=1, precision=0, label="Empaque (units/pack)")
         with gr.Row():
             in_costo = gr.Number(value=1000, label="Costo (DOP) — for the cost figure only")
             in_precio = gr.Number(value=2500, label="Precio detalle (DOP) — for the cost figure only")
@@ -408,11 +406,11 @@ with gr.Blocks(title="Display Internacional — dead-stock classifier") as demo:
         out = gr.Dataframe(label="P(dead) per model")
         out_cost = gr.Markdown()
 
-        def _score(desc, prefix, dept, supplier, area, empaque, costo, precio):
+        def _score(desc, prefix, dept, supplier, area, costo, precio):
             dept_val = -1 if dept == "(other)" else dept  # catch-all → unseen dept id
-            return score(desc, prefix, dept_val, supplier, area, empaque, costo, precio)
+            return score(desc, prefix, dept_val, supplier, area, costo, precio)
 
-        go.click(_score, [in_desc, in_prefix, in_dept, in_supplier, in_area, in_empaque, in_costo, in_precio],
+        go.click(_score, [in_desc, in_prefix, in_dept, in_supplier, in_area, in_costo, in_precio],
                  [out, out_cost])
 
 

@@ -46,10 +46,11 @@ MODELS_DIR = ROOT / "models"
 # C stops at 1: with {0.01, 0.1, 1, 10}, C=10 won validation by 0.0006 AUC over C=1 (noise),
 # and at that near-zero L2 the manual gradient-descent loop stopped 1.85 short of sklearn on
 # its worst coefficient (2000 epochs; still 0.91 at 50k) along the correlated/heavy-tailed
-# empaque, log1p_empaque and size_cm columns, with test AUC unchanged. Written up in REPORT.md.
+# empaque, log1p_empaque and size_cm columns (since dropped / log-transformed), with test AUC
+# unchanged. Written up in REPORT.md.
 LOGREG_CS = [0.01, 0.1, 1.0]
 MANUAL_LRS = [0.1, 0.01, 0.001]
-MANUAL_EPOCHS = 5000  # 2000 left the manual loop 0.72 off sklearn at C=1; 5000 was the agreed next step
+MANUAL_EPOCHS = 2000
 # nn.Linear + Adam: lr is fixed (Adam is forgiving); weight_decay is matched to the
 # chosen C below so all three models land on ~the same coefficients.
 TORCH_LR = 0.05
@@ -341,7 +342,7 @@ def main() -> None:
     # 5. Console summary so the owner can eyeball convergence and agreement.
     print(f"\nthreshold chosen on validation: {threshold:.2f}  "
           f"(val cost {val_costs[threshold]:.0f} DOP vs {val_costs[0.5]:.0f} at 0.5; "
-          f"FP = {FP_MARGIN_MULTIPLIER:g} x margin per SKU, FN = {FN_COST:.0f} flat)")
+          f"FP = {FP_MARGIN_MULTIPLIER:g} x margin per SKU capped, FN = {FN_COST:.0f} flat)")
     rows = [
         ("baseline majority", metrics["baseline_majority"]["test"]),
         ("baseline cost>median", metrics["baseline_cost_median"]["test"]),

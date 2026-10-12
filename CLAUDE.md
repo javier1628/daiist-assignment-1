@@ -12,7 +12,8 @@ so the family reviews ~200 top candidates for discontinuation instead of the who
 
 Cost assumptions (the owner's, stated as assumptions, values live in `src/data.py`):
 - false positive = discontinuing a live item = `FP_COST` DOP
-- false negative = keeping a dead item listed = `FN_COST` DOP
+- false negative = keeping a dead item listed = `FN_COST_PER_YEAR` × `HORIZON_YEARS` = `FN_COST` DOP
+  (FP is a one-off loss, FN recurs each year the listing survives, so both use one horizon)
 The decision threshold is chosen to minimise expected cost `FP_COST·FP + FN_COST·FN` on the
 validation slice, and the dashboard recomputes that cost live as the threshold moves.
 

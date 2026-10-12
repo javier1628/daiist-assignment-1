@@ -39,9 +39,8 @@
   "freq_supplier",
   "freq_dpto",
   "freq_area",
-  "size_cm",
+  "log1p_size_cm",
   "has_dims",
   "has_color",
-  "n_words",
-  "log1p_empaque"
+  "n_words"
 ]

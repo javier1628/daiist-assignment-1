@@ -19,7 +19,7 @@ Target: `dead = (Stock <= 0) & (Punto reorden == 0)` on `Tipo == 'Producto'` row
 | Precio mínimo | floor price | **excluded as feature** (markup × cost) |
 | Margen % | (Precio − Costo)/Precio | **excluded as feature** (function of price and cost) |
 | Valor inventario | Stock × Costo | **excluded — derived from Stock** |
-| Empaque | units per pack | feature |
+| Empaque | units per pack | not a feature (1 for 99.7% of SKUs) |
 | Suplidor (ID) | supplier code (no names available) | feature (freq-encoded) |
 | Área (ID) | area code | feature (freq-encoded) |
 | Dpto (ID) | department code | feature (freq + top-N one-hot) |
