@@ -27,7 +27,7 @@ from sklearn.metrics import roc_curve
 import gradio as gr
 
 from src import data
-from src.data import FN_COST, FP_COST
+from src.data import FN_COST, FP_MARGIN_MULTIPLIER, fp_cost_per_sku
 from src.features import build_features, family, material
 
 MODELS_DIR = Path(__file__).resolve().parent / "models"
@@ -61,6 +61,8 @@ torch_model.eval()
 # The cost-minimising threshold train.py picked on the validation slice.
 THRESHOLD = float(metrics["threshold"]["chosen"])
 Y_TEST = test_preds["y_true"].to_numpy(dtype=int)
+# Per-SKU cost of a false positive, from the price and cost columns saved with the predictions.
+FP_COST_TEST = fp_cost_per_sku(test_preds).to_numpy(dtype=float)
 
 # Raw data, only for the Data tab's charts (reading, not retraining). The label is rebuilt
 # here purely to colour the charts by class.
@@ -111,6 +113,15 @@ def _confusion(y_true: np.ndarray, prob: np.ndarray, threshold: float) -> tuple[
     fn = int(np.sum((y_pred == 0) & (y_true == 1)))
     tn = int(np.sum((y_pred == 0) & (y_true == 0)))
     return tn, fp, fn, tp
+
+
+def _cost(y_true: np.ndarray, prob: np.ndarray, threshold: float) -> tuple[float, float]:
+    """(false-positive cost, false-negative cost) in DOP at a threshold: each false positive
+    costs that SKU's own FP_COST_TEST entry, each false negative the flat FN_COST."""
+    y_pred = (prob >= threshold).astype(int)
+    fp_mask = (y_pred == 1) & (y_true == 0)
+    fn = int(np.sum((y_pred == 0) & (y_true == 1)))
+    return float(FP_COST_TEST[fp_mask].sum()), float(FN_COST * fn)
 
 
 def _fig(figsize):
@@ -262,9 +273,9 @@ def threshold_view(threshold: float, model_name: str):
     probabilities every time the slider moves. Nothing is retrained."""
     prob = test_preds[PROB_COL[model_name]].to_numpy()
     tn, fp, fn, tp = _confusion(Y_TEST, prob, threshold)
-    cost = FP_COST * fp + FN_COST * fn
-    cost_at_chosen = FP_COST * _confusion(Y_TEST, prob, THRESHOLD)[1] + \
-        FN_COST * _confusion(Y_TEST, prob, THRESHOLD)[2]
+    fp_cost, fn_cost = _cost(Y_TEST, prob, threshold)
+    cost = fp_cost + fn_cost
+    cost_at_chosen = sum(_cost(Y_TEST, prob, THRESHOLD))
 
     cm = np.array([[tn, fp], [fn, tp]])
     fig, ax = _fig(figsize=(4.5, 4))
@@ -280,14 +291,16 @@ def threshold_view(threshold: float, model_name: str):
 
     flagged = tp + fp
     note = (
-        f"### Expected cost: **{cost:,.0f} DOP** on the {len(Y_TEST)} test SKUs\n"
-        f"= {fp} false positives × {FP_COST:,.0f} (discontinuing a live item) "
-        f"+ {fn} false negatives × {FN_COST:,.0f} (keeping a dead one listed).\n\n"
-        f"{flagged} SKUs flagged for review, {tp} of them actually dead "
-        f"(precision {tp / flagged if flagged else 0:.0%}); {fn} dead SKUs missed.\n\n"
+        f"### {flagged} of {len(Y_TEST)} test SKUs flagged · expected cost **{cost:,.0f} DOP**\n"
+        f"- false positives: {fp} live items flagged, costing **{fp_cost:,.0f}** "
+        f"({FP_MARGIN_MULTIPLIER:.0f} × each SKU's own margin, Precio detalle − Costo)\n"
+        f"- false negatives: {fn} dead items missed, costing **{fn_cost:,.0f}** "
+        f"({fn} × flat {FN_COST:,.0f})\n\n"
+        f"Of the {flagged} flagged, {tp} are actually dead "
+        f"(precision {tp / flagged if flagged else 0:.0%}).\n\n"
         f"Cost-minimising threshold chosen on the validation slice: **{THRESHOLD:.2f}** "
         f"(this model's test cost there: {cost_at_chosen:,.0f} DOP). "
-        f"FP/FN costs are assumptions, set in `src/data.py`."
+        f"Cost rules are assumptions, set in `src/data.py`."
     )
     return fig, note
 

@@ -18,11 +18,21 @@ LEAKY_COLUMNS = [
     "Stock", "Estado stock", "Valor inventario", "Punto reorden", "Cant. reorden", "Alertas",
 ]
 
-# Business cost of each kind of mistake, in DOP. ASSUMPTIONS, not measured figures:
-# a false positive discontinues a live item; a false negative keeps a dead one listed.
-# Used by train.py to pick the threshold and by app.py to show the live cost figure.
-FP_COST = 1500.0
-FN_COST = 300.0
+# Price columns: never features (they are markup x cost and add nothing beyond Costo), but
+# they ARE read by fp_cost_per_sku below to price a false positive. tests/test_leakage.py
+# checks that build_features ignores them.
+PRICE_COLUMNS = [
+    "Precio detalle", "Precio mayor 1", "Precio mayor 2", "Precio mayor 3", "Precio mínimo",
+    "Margen %",
+]
+
+# Business cost of each kind of mistake, in DOP. ASSUMPTIONS, not measured figures.
+# False positive = discontinuing a live item: we lose its margin (Precio detalle - Costo),
+# assumed to be lost twice over (the sale that was in the pipeline and the next one),
+# hence the multiplier. Per SKU, floored at 0 for the few items priced below cost.
+# False negative = keeping a dead item listed: a flat catalogue/admin/storage drag per SKU.
+FP_MARGIN_MULTIPLIER = 2.0
+FN_COST = 500.0
 
 
 def load_raw() -> pd.DataFrame:
@@ -36,6 +46,14 @@ def make_target(df: pd.DataFrame) -> pd.Series:
     """Dead stock = nothing on hand AND no reorder point, i.e. the system does not intend
     to restock it. Returned as int (1 = dead, 0 = live)."""
     return ((df["Stock"] <= 0) & (df["Punto reorden"] == 0)).astype(int)
+
+
+def fp_cost_per_sku(df: pd.DataFrame) -> pd.Series:
+    """Cost of wrongly flagging each SKU as dead: FP_MARGIN_MULTIPLIER x its unit margin,
+    never negative. Works on any frame that has Precio detalle and Costo (raw rows or
+    test_predictions.csv)."""
+    margin = df["Precio detalle"] - df["Costo"]
+    return (FP_MARGIN_MULTIPLIER * margin).clip(lower=0.0)
 
 
 def split(df: pd.DataFrame):
