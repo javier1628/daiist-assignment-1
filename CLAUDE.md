@@ -1,23 +1,42 @@
-# Display Internacional — SKU cost estimator (Assignment 1)
+# Display Internacional — dead-stock classifier (Assignment 1)
 
-Course assignment: train the SAME linear regression three ways (scikit-learn, manual PyTorch
-loop, `torch.nn.Module` + `torch.optim`), compare against a baseline, serve from a Gradio
+Course assignment: train the SAME logistic regression three ways (scikit-learn, manual PyTorch
+loop, `torch.nn.Module` + `torch.optim`), compare against baselines, serve from a Gradio
 dashboard that loads saved models and never retrains. Grading is a written comprehension
 check without the code, so the owner must understand every line. See PLAN.md for the full plan.
 
+## Business framing
+Display Internacional has ~1,300 zero-stock SKUs in a ~2,100-SKU catalogue. Nobody can review
+them all. The model scores each SKU with a probability of being **dead stock** and ranks them,
+so the family reviews ~200 top candidates for discontinuation instead of the whole catalogue.
+
+Cost assumptions (the owner's, stated as assumptions, values live in `src/data.py`):
+- false positive = discontinuing a live item = `FP_COST` DOP
+- false negative = keeping a dead item listed = `FN_COST` DOP
+The decision threshold is chosen to minimise expected cost `FP_COST·FP + FN_COST·FN` on the
+validation slice, and the dashboard recomputes that cost live as the threshold moves.
+
 ## Hard constraints — do not relax these
-- Target is `log(Costo)`. Never predict raw `Costo`.
-- **Leakage: NEVER use as features** any price column (`Precio detalle`, `Precio mayor 1/2/3`,
-  `Precio mínimo`, `Margen %`) — they are markup × cost. Nor any stock column
-  (`Stock`, `Estado stock`, `Valor inventario`, `Punto reorden`, `Cant. reorden`, `Alertas`).
-- Only linear regression. No trees, no boosting, no neural nets beyond a single `nn.Linear`.
-- Tuning is limited to regularization strength (alpha / weight_decay) and learning rate for the
-  two PyTorch versions. No grid search over anything else. No AutoML.
+- Target is binary: `dead = (Stock <= 0) & (Punto reorden == 0)`, on `Tipo == 'Producto'` rows
+  with `Costo > 0`. `make_target` in `src/data.py` returns it as int. Nothing else defines it.
+- **Leakage: NEVER use as features** `Stock`, `Estado stock`, `Valor inventario`,
+  `Punto reorden`, `Cant. reorden`, `Alertas` — the label is built from these.
+- **Price columns stay excluded**: `Precio detalle`, `Precio mayor 1/2/3`, `Precio mínimo`,
+  `Margen %`. They are markup × cost and add nothing beyond `Costo`.
+- `Costo` IS an allowed feature now, as `log_costo = log(Costo)`.
+- Only logistic regression. No trees, no boosting, no neural nets beyond a single `nn.Linear`.
+- Three models: `LogisticRegression(C)`; manual PyTorch loop with sigmoid + binary
+  cross-entropy + L2 on raw tensors; `nn.Linear` + `BCEWithLogitsLoss` + `Adam`.
+- Metrics: accuracy, precision, recall, F1, ROC-AUC, plus expected business cost at the chosen
+  threshold. Report test metrics at 0.5 and at the chosen threshold.
+- Baselines: majority class, and "dead if Costo > train median".
+- Tuning is limited to C / L2 strength and learning rate for the two PyTorch versions, chosen on
+  the validation slice by ROC-AUC. No grid search over anything else. No AutoML.
 - `train.py` is the only script that fits anything. `app.py` loads from `models/` and must fail
   loudly if a model file is missing rather than retraining.
 - Same train/test split for all three models: `random_state=42`, 80/20, defined once in
   `src/data.py`. Scaler fit on train only.
-- Keep it small: pandas, numpy, scikit-learn, torch, gradio, matplotlib/plotly. No extra deps
+- Keep it small: pandas, numpy, scikit-learn, torch, gradio, matplotlib. No extra deps
   without asking.
 
 ## Running
@@ -37,7 +56,8 @@ generate, but keep it readable and commented so it can be explained from memory.
 
 ## Data
 `data/inventario_julio_2025_limpio.csv` — 2,098 SKUs, July 2025 stock snapshot, cleaned.
-Modelling subset: `Tipo == 'Producto'` and `Costo > 0` → 2,067 rows. Currency DOP (assumed).
+Modelling subset: `Tipo == 'Producto'` and `Costo > 0` → 2,067 rows, of which 1,253 (60.6%)
+are dead by the definition above. Currency DOP (assumed).
 `Suplidor (ID)`, `Área (ID)`, `Dpto (ID)` are numeric codes; names are not available.
 Column meanings are in `data/README.md`.
 
